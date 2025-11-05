@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Donut Timetable - Clickable Map (active via ?active=HH or local time)</title>
 <style>
-  :root { --size: 900px; --panel-width: 360px; }
+  :root { --size: 1000px; --panel-width: 360px; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
     margin: 0;
@@ -18,8 +18,11 @@
     box-sizing: border-box;
   }
 
-  .wrap { width: min(1000px, calc(100% - 40px)); position: relative; display:grid; grid-template-columns: 1fr var(--panel-width); gap:16px; align-items:start; transition: grid-template-columns .18s ease; }
+  /* grid: panel (left) | preview (right) */
+  .wrap { width: min(var(--size), calc(100% - 40px)); position: relative; display:grid; grid-template-columns: 0px 1fr; gap:16px; align-items:start; transition: grid-template-columns .18s ease; }
+  .panel { width: var(--panel-width); }
   .preview { width: 100%; position: relative; }
+
   .donut-img { width: 100%; height: auto; display: block; border-radius: 8px; }
   .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
   svg { width: 100%; height: 100%; pointer-events: auto; }
@@ -30,9 +33,9 @@
 
   /* 설정 패널 */
   #setupForm { background:#fff; border-radius:8px; padding:12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); height:calc(100% - 0px); overflow:auto;
-               transform: translateX(0); transition: transform .22s ease, opacity .18s ease; will-change: transform, opacity; }
-  /* hidden state */
-  #setupForm.hidden { transform: translateX(14px) translateY(0) scale(.98); opacity: 0; pointer-events: none; height: auto; }
+               transform: translateX(-8px); transition: transform .22s ease, opacity .18s ease; will-change: transform, opacity; }
+  /* hidden state (moved out to left) */
+  #setupForm.hidden { transform: translateX(-18px) scale(.98); opacity: 0; pointer-events: none; height: auto; }
 
   #setupForm h3 { margin:0 0 8px 0; font-size:16px; }
   .inputs { display:grid; grid-template-columns: repeat(1, 1fr); gap:6px; }
@@ -45,10 +48,10 @@
   .btn.warn { background:#fff4e5; border-color:#ffd499; }
   .small-note { font-size:12px; color:#666; margin-top:8px; }
 
-  /* 토글 버튼 (floating) */
+  /* 토글 버튼 (왼쪽에 위치) */
   #toggleBtn {
     position: absolute;
-    right: calc( (100% - min(1000px, calc(100% - 40px))) / 2 + 8px ); /* align to panel area */
+    left: calc( (100% - min(var(--size), calc(100% - 40px))) / 2 - 48px ); /* place left of the panel area */
     top: 8px;
     z-index: 60;
     width:40px;
@@ -69,13 +72,32 @@
   /* mobile adjustments */
   @media (max-width: 920px) {
     .wrap { grid-template-columns: 1fr; }
-    #setupForm { position:fixed; right:12px; top:72px; width: calc(100% - 24px); max-width:420px; z-index:80; }
-    #toggleBtn { right: 12px; top: 12px; }
+    .panel { display:none; } /* panel becomes overlay for small screens (handled in JS) */
+    #setupForm { position:fixed; left:12px; top:72px; width: calc(100% - 24px); max-width:420px; z-index:80; }
+    #toggleBtn { left: 12px; top: 12px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap" id="wrap">
+  <!-- panel first so it appears on the left in grid -->
+  <div class="panel">
+    <form id="setupForm" class="hidden" aria-hidden="true" onsubmit="return false;">
+      <h3>Donut 링크 설정</h3>
+      <div class="small-note">각 시간(0~23)에 해당하는 링크를 입력하세요. 빈 칸이면 클릭 시 안내가 표시됩니다.</div>
+      <div id="inputs" class="inputs" style="margin-top:8px;"></div>
+
+      <div class="form-actions">
+        <button id="saveBtn" class="btn primary" type="button">저장</button>
+        <button id="clearBtn" class="btn warn" type="button">초기화(로컬삭제)</button>
+      </div>
+
+      <div class="small-note" style="margin-top:10px;">
+        • 저장된 설정은 이 브라우저의 로컬스토리지에 보관됩니다. 브라우저 데이터(쿠키/사이트 데이터)를 지우면 삭제됩니다.
+      </div>
+    </form>
+  </div>
+
   <div class="preview">
     <!-- Replace this src with your public image URL (or keep pie2.png in the same folder when hosting) -->
     <img id="donutImg" class="donut-img" src="./pie2.png" alt="Donut timetable image" />
@@ -83,21 +105,6 @@
       <svg id="svgOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="false"></svg>
     </div>
   </div>
-
-  <form id="setupForm" class="hidden" aria-hidden="true" onsubmit="return false;">
-    <h3>Donut 링크 설정</h3>
-    <div class="small-note">각 시간(0~23)에 해당하는 링크를 입력하세요. 빈 칸이면 클릭 시 안내가 표시됩니다.</div>
-    <div id="inputs" class="inputs" style="margin-top:8px;"></div>
-
-    <div class="form-actions">
-      <button id="saveBtn" class="btn primary" type="button">저장</button>
-      <button id="clearBtn" class="btn warn" type="button">초기화(로컬삭제)</button>
-    </div>
-
-    <div class="small-note" style="margin-top:10px;">
-      • 저장된 설정은 이 브라우저의 로컬스토리지에 보관됩니다. 브라우저 데이터(쿠키/사이트 데이터)를 지우면 삭제됩니다.
-    </div>
-  </form>
 </div>
 
 <!-- 토글 버튼 (설정 열기/닫기) -->
@@ -279,6 +286,7 @@ document.addEventListener('keydown', function(e){
   const clearBtn = document.getElementById('clearBtn');
   const formEl = document.getElementById('setupForm');
   const toggleBtn = document.getElementById('toggleBtn');
+  const wrapEl = document.getElementById('wrap');
 
   // create 24 input rows
   for (let i = 0; i < 24; i++) {
@@ -333,36 +341,36 @@ document.addEventListener('keydown', function(e){
   // populate with stored or defaults on open
   loadToForm();
 
-  // toggle behavior
+  // toggle behavior (left slide)
   function openPanel() {
     formEl.classList.remove('hidden');
     formEl.setAttribute('aria-hidden', 'false');
     toggleBtn.classList.add('open');
     toggleBtn.setAttribute('aria-expanded', 'true');
-    // when panel opened, shrink wrap grid to show panel area (desktop)
-    document.getElementById('wrap').style.gridTemplateColumns = '1fr var(--panel-width)';
+    // set grid so left column is panel
+    wrapEl.style.gridTemplateColumns = 'var(--panel-width) 1fr';
   }
   function closePanel() {
     formEl.classList.add('hidden');
     formEl.setAttribute('aria-hidden', 'true');
     toggleBtn.classList.remove('open');
     toggleBtn.setAttribute('aria-expanded', 'false');
-    document.getElementById('wrap').style.gridTemplateColumns = '1fr 0px';
+    wrapEl.style.gridTemplateColumns = '0px 1fr';
   }
 
   // initialize as closed
   closePanel();
 
-  toggleBtn.addEventListener('click', function(){
+  toggleBtn.addEventListener('click', function(e){
+    e.stopPropagation();
     if (formEl.classList.contains('hidden')) openPanel();
     else closePanel();
   });
 
-  // close panel when clicking outside on mobile (optional)
+  // close panel when clicking outside on mobile
   document.addEventListener('click', function(e){
     const isClickInside = formEl.contains(e.target) || toggleBtn.contains(e.target);
     if (!isClickInside && !formEl.classList.contains('hidden')) {
-      // close on outside click for mobile friendliness
       if (window.innerWidth <= 920) closePanel();
     }
   });
