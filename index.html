@@ -14,8 +14,11 @@
     justify-content: center;
     min-height: 100vh;
     background: #fafafa;
+    padding: 20px;
+    box-sizing: border-box;
   }
-  .wrap { width: min(90vw, var(--size)); position: relative; }
+  .wrap { width: min(1000px, calc(100% - 40px)); position: relative; display:grid; grid-template-columns: 1fr 320px; gap:16px; align-items:start; }
+  .preview { width: 100%; position: relative; }
   .donut-img { width: 100%; height: auto; display: block; border-radius: 8px; }
   .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
   svg { width: 100%; height: 100%; pointer-events: auto; }
@@ -23,42 +26,70 @@
   .slice:hover { opacity: .85; transform: scale(1.02); }
   .slice.active { fill-opacity: 0.28 !important; stroke: #1a73e8 !important; stroke-width: 2.2; }
   .label { font-size: 11px; text-anchor: middle; dominant-baseline: central; fill: #111; pointer-events: none; font-weight:500; }
-  .controls { text-align: center; font-size: 14px; color: #444; margin-top: 10px; }
-  .note { font-size: 13px; color:#666; margin-top:6px; }
+
+  /* 설정 패널 */
+  #setupForm { background:#fff; border-radius:8px; padding:12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); height:calc(100% - 0px); overflow:auto; }
+  #setupForm h3 { margin:0 0 8px 0; font-size:16px; }
+  .inputs { display:grid; grid-template-columns: repeat(1, 1fr); gap:6px; }
+  .hour-row { display:flex; gap:8px; align-items:center; }
+  .hour-row label { min-width:86px; font-size:13px; color:#333; }
+  .hour-row input[type="url"] { flex:1; padding:6px 8px; border:1px solid #ddd; border-radius:5px; font-size:13px; }
+  .form-actions { display:flex; gap:8px; margin-top:8px; }
+  .btn { padding:8px 10px; border-radius:6px; border:1px solid #cfcfcf; background:#f7f7f7; cursor:pointer; font-size:13px; }
+  .btn.primary { background:#1a73e8; color:#fff; border-color:#1765d6; }
+  .btn.warn { background:#fff4e5; border-color:#ffd499; }
+  .small-note { font-size:12px; color:#666; margin-top:8px; }
+
+  @media (max-width: 920px) {
+    .wrap { grid-template-columns: 1fr; }
+    #setupForm { height:auto; max-height:50vh; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- Replace this src with your public image URL (or keep pie2.png in the same folder when hosting) -->
-  <img id="donutImg" class="donut-img" src="./pie2.png" alt="Donut timetable image" />
-  <div class="overlay" role="presentation">
-    <svg id="svgOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="false"></svg>
+  <div class="preview">
+    <!-- Replace this src with your public image URL (or keep pie2.png in the same folder when hosting) -->
+    <img id="donutImg" class="donut-img" src="./pie2.png" alt="Donut timetable image" />
+    <div class="overlay" role="presentation">
+      <svg id="svgOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="false"></svg>
+    </div>
   </div>
+
+  <form id="setupForm" onsubmit="return false;">
+    <h3>Donut 링크 설정</h3>
+    <div class="small-note">각 시간(0~23)에 해당하는 링크를 입력하세요. 빈 칸이면 클릭 시 안내가 표시됩니다.</div>
+    <div id="inputs" class="inputs" style="margin-top:8px;"></div>
+
+    <div class="form-actions">
+      <button id="saveBtn" class="btn primary" type="button">저장</button>
+      <button id="loadBtn" class="btn" type="button">불러오기</button>
+      <button id="clearBtn" class="btn warn" type="button">초기화(로컬삭제)</button>
+    </div>
+
+    <div class="small-note" style="margin-top:10px;">
+      • 저장된 설정은 이 브라우저의 로컬스토리지에 보관됩니다. 브라우저 데이터(쿠키/사이트 데이터)를 지우면 삭제됩니다.<br>
+      • GitHub Pages에 배포하면 파일 수정 없이 바로 작동합니다. (단, 이미지와 index.html이 같은 폴더에 있어야 함)
+    </div>
+  </form>
 </div>
 
-<!-- <div class="controls">
-  <div>• URL 쿼리 <code>?active=HH</code> 가 있으면 해당 시각(HH) 조각 강조 (예: <code>?active=15</code>)</div>
-  <div class="note">• 쿼리 없으면 방문자의 로컬 시간으로 자동 강조됩니다. • 각 조각 클릭 시 slices 배열에 설정한 URL이 새 탭으로 열립니다.</div>
-</div> -->
-
 <script>
-/* ========== 사용자 설정 (여기에 각 시간대별 실제 URL 넣으세요) ==========
-   현재 예시는 "https://www.notion.so/yourworkspace/..." 형태의 플레이스홀더 링크가 들어있습니다.
-   배포 전 반드시 자신의 실제 Notion 공유 링크(또는 다른 URL)로 대체하세요. */
-const slices = [
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a15c5fe0062807088cff5ab905d6e4e&pm=s", // 오후 12시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628052a844e8a965d970c2&pm=s", // 오전 1시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628062a540de1854d44197&pm=s", // 오전 2시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280388d7cffe0f4b0d5e6&pm=s", // 오전 3시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628040bf8cc3c40f39376f&pm=s", // 오전 4시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062802798eaf56e9997f040&pm=s", // 오전 5시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280918cc7cf175d2229f4&pm=s", // 오전 6시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280b5829dd6b9103f1f76&pm=s", // 오전 7시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280ca8b8dea78ca95efca&pm=s", // 오전 8시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062809d8ed6c8d4fc586d26&pm=s", // 오전 9시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062809e8897da7b86e29004&pm=s", // 오전 10시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280008c9bd856233e5ff8&pm=s", // 오전 11시
-  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280558f47ceb967c9c697&pm=s", // 오전 12시
+/* ========== 기본값 (템플릿 배포 시 폴백으로 사용됩니다) ========== */
+const defaultSlices = [
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a15c5fe0062807088cff5ab905d6e4e&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628052a844e8a965d970c2&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628062a540de1854d44197&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280388d7cffe0f4b0d5e6&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628040bf8cc3c40f39376f&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062802798eaf56e9997f040&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280918cc7cf175d2229f4&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280b5829dd6b9103f1f76&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280ca8b8dea78ca95efca&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062809d8ed6c8d4fc586d26&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062809e8897da7b86e29004&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280008c9bd856233e5ff8&pm=s",
+  "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280558f47ceb967c9c697&pm=s",
   "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe00628049aba8c6732246d080&pm=s",
   "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe0062805d96a6e66b52824870&pm=s",
   "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280bca8c8e02b817e801f&pm=s",
@@ -72,6 +103,8 @@ const slices = [
   "https://www.notion.so/2a15c5fe006280f9848ff05626872232?p=2a25c5fe006280fa9f0ce7a06f0b1fda&pm=s"
 ];
 /* ====================================================================== */
+
+const STORAGE_KEY = 'donut_slices';
 
 // 색상, geometry
 const colors = [
@@ -130,49 +163,80 @@ function getInitialActiveIndex() {
 
 let activeIdx = getInitialActiveIndex();
 
-// create sectors and labels
-for (let i = 0; i < total; i++) {
-  const a0 = startOffset + (i/total) * Math.PI*2;
-  const a1 = startOffset + ((i+1)/total) * Math.PI*2;
-  const pathD = makeSectorPath(cx, cy, r, R, a0, a1);
-
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", pathD);
-  path.setAttribute("fill", colors[i % colors.length]);
-  path.setAttribute("fill-opacity", "0.06");
-  path.setAttribute("stroke", "#9aa0a6");
-  path.setAttribute("stroke-width", "1");
-  path.classList.add("slice");
-
-  // click handler: set active + open link
-  (function(idx, node){
-    node.addEventListener('click', function(e){
-      e.preventDefault();
-      setActive(idx);
-      const url = slices[idx] || "#";
-      if (url.startsWith("#")) {
-        alert(`${hourLabel(idx)} 클릭됨 (placeholder link). 실제 URL로 slices[${idx}]를 교체하세요.`);
-      } else {
-        window.open(url, "_blank");
-      }
-    });
-    node.addEventListener('mouseenter', function(){ node.setAttribute("fill-opacity", "0.14"); });
-    node.addEventListener('mouseleave', function(){ if(!node.classList.contains('active')) node.setAttribute("fill-opacity", "0.06"); });
-  })(i, path);
-
-  const mid = (a0 + a1) / 2;
-  const labelPt = polarToCartesian(cx, cy, (r+R)/2, mid);
-  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  text.setAttribute("x", labelPt.x.toFixed(2));
-  text.setAttribute("y", labelPt.y.toFixed(2));
-  text.setAttribute("class", "label");
-  text.textContent = hourLabel(i);
-
-  svg.appendChild(path);
-  svg.appendChild(text);
+/* ======= storage helpers ======= */
+function readSlicesFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return null;
+    return arr;
+  } catch (e) {
+    return null;
+  }
+}
+function writeSlicesToStorage(arr) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function getSliceUrl(idx) {
+  const stored = readSlicesFromStorage();
+  if (stored && stored[idx]) return stored[idx];
+  return defaultSlices[idx] || '';
 }
 
-// setActive function
+/* ======= build SVG slices and labels ======= */
+function buildDonut() {
+  // clear any existing
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  for (let i = 0; i < total; i++) {
+    const a0 = startOffset + (i/total) * Math.PI*2;
+    const a1 = startOffset + ((i+1)/total) * Math.PI*2;
+    const pathD = makeSectorPath(cx, cy, r, R, a0, a1);
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathD);
+    path.setAttribute("fill", colors[i % colors.length]);
+    path.setAttribute("fill-opacity", "0.06");
+    path.setAttribute("stroke", "#9aa0a6");
+    path.setAttribute("stroke-width", "1");
+    path.classList.add("slice");
+
+    // click handler: set active + open link (use storage)
+    (function(idx, node){
+      node.addEventListener('click', function(e){
+        e.preventDefault();
+        setActive(idx);
+        const url = getSliceUrl(idx) || "#";
+        if (!url || url.startsWith("#")) {
+          alert(`${hourLabel(idx)} 클릭됨 — 링크가 설정되어 있지 않습니다.\n설정 창에서 URL을 입력하고 저장하세요.`);
+        } else {
+          window.open(url, "_blank");
+        }
+      });
+      node.addEventListener('mouseenter', function(){ node.setAttribute("fill-opacity", "0.14"); });
+      node.addEventListener('mouseleave', function(){ if(!node.classList.contains('active')) node.setAttribute("fill-opacity", "0.06"); });
+    })(i, path);
+
+    const mid = (a0 + a1) / 2;
+    const labelPt = polarToCartesian(cx, cy, (r+R)/2, mid);
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", labelPt.x.toFixed(2));
+    text.setAttribute("y", labelPt.y.toFixed(2));
+    text.setAttribute("class", "label");
+    text.textContent = hourLabel(i);
+
+    svg.appendChild(path);
+    svg.appendChild(text);
+  }
+}
+
+/* setActive function */
 function setActive(i) {
   const all = svg.querySelectorAll(".slice");
   all.forEach((s, idx) => {
@@ -191,10 +255,11 @@ function setActive(i) {
   activeIdx = i;
 }
 
-// initial highlight
+/* initial render */
+buildDonut();
 setActive(activeIdx);
 
-// Optional: allow left/right arrow to change active slice (for keyboard users)
+/* keyboard support */
 document.addEventListener('keydown', function(e){
   if (e.key === 'ArrowRight') {
     setActive((activeIdx + 1) % total);
@@ -202,6 +267,69 @@ document.addEventListener('keydown', function(e){
     setActive((activeIdx - 1 + total) % total);
   }
 });
+
+/* ======= Setup form: build inputs, load/save behavior ======= */
+(function setupPanel() {
+  const inputsWrap = document.getElementById('inputs');
+  const saveBtn = document.getElementById('saveBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  // create 24 input rows
+  for (let i = 0; i < 24; i++) {
+    const row = document.createElement('div');
+    row.className = 'hour-row';
+    const label = document.createElement('label');
+    label.setAttribute('for', 'slice-'+i);
+    label.textContent = `${i}: ${hourLabel(i)}`;
+    const inp = document.createElement('input');
+    inp.type = 'url';
+    inp.id = 'slice-'+i;
+    inp.placeholder = 'https://example.com/... (빈칸 가능)';
+    inp.style.minWidth = '120px';
+    row.appendChild(label);
+    row.appendChild(inp);
+    inputsWrap.appendChild(row);
+  }
+
+  function loadToForm() {
+    const stored = readSlicesFromStorage();
+    for (let i = 0; i < 24; i++) {
+      const el = document.getElementById('slice-'+i);
+      if (stored && stored[i]) el.value = stored[i];
+      else el.value = defaultSlices[i] || '';
+    }
+  }
+
+  function saveFromForm() {
+    const arr = [];
+    for (let i = 0; i < 24; i++) {
+      const v = document.getElementById('slice-'+i).value.trim();
+      arr.push(v);
+    }
+    const ok = writeSlicesToStorage(arr);
+    if (ok) {
+      alert('설정이 저장되었습니다. (로컬스토리지)');
+      // re-render behavior depends only on getSliceUrl so no need to rebuild donut, but good to notify
+    } else {
+      alert('저장에 실패했습니다. 브라우저 설정을 확인하세요.');
+    }
+  }
+
+  function clearStorageAndReset() {
+    localStorage.removeItem(STORAGE_KEY);
+    loadToForm();
+    alert('로컬 저장된 설정을 제거하고 기본값으로 복원했습니다.');
+  }
+
+  // bind
+  saveBtn.addEventListener('click', saveFromForm);
+  loadBtn.addEventListener('click', loadToForm);
+  clearBtn.addEventListener('click', clearStorageAndReset);
+
+  // populate with stored or defaults on open
+  loadToForm();
+})();
 </script>
 </body>
 </html>
