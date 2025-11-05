@@ -48,22 +48,22 @@
   .btn.warn { background:#fff4e5; border-color:#ffd499; }
   .small-note { font-size:12px; color:#666; margin-top:8px; }
 
-  /* 토글 버튼 (왼쪽에 위치) */
+  /* 토글 버튼 (도넛 바로 왼쪽 상단으로 이동) */
   #toggleBtn {
     position: absolute;
-    left: calc( (100% - min(var(--size), calc(100% - 40px))) / 2 - 48px ); /* place left of the panel area */
-    top: 8px;
+    left: 12px;   /* 도넛 기준 왼쪽 여백 */
+    top: 12px;    /* 도넛 기준 상단 여백 */
     z-index: 60;
-    width:40px;
-    height:40px;
-    border-radius:10px;
-    border:1px solid rgba(0,0,0,0.08);
-    background:#fff;
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-    cursor:pointer;
+    cursor: pointer;
     transition: transform .12s ease, box-shadow .12s ease;
   }
   #toggleBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.12); }
@@ -104,11 +104,12 @@
     <div class="overlay" role="presentation">
       <svg id="svgOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="false"></svg>
     </div>
+    <!-- 토글 버튼 (설정 열기/닫기) -->
+    <button id="toggleBtn" aria-expanded="false" title="설정 열기">⚙️</button>
   </div>
 </div>
 
-<!-- 토글 버튼 (설정 열기/닫기) -->
-<button id="toggleBtn" aria-expanded="false" title="설정 열기">⚙️</button>
+
 
 <script>
 /* ========== 기본값 (템플릿 배포 시 폴백으로 사용됩니다) ========== */
