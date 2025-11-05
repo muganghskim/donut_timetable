@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Donut Timetable - Clickable Map (active via ?active=HH or local time)</title>
+<style>
+  :root { --size: 900px; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #fafafa;
+  }
+  .wrap { width: min(90vw, var(--size)); position: relative; }
+  .donut-img { width: 100%; height: auto; display: block; border-radius: 8px; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  svg { width: 100%; height: 100%; pointer-events: auto; }
+  .slice { cursor: pointer; transition: opacity .15s, transform .15s; }
+  .slice:hover { opacity: .85; transform: scale(1.02); }
+  .slice.active { fill-opacity: 0.28 !important; stroke: #1a73e8 !important; stroke-width: 2.2; }
+  .label { font-size: 11px; text-anchor: middle; dominant-baseline: central; fill: #111; pointer-events: none; font-weight:500; }
+  .controls { text-align: center; font-size: 14px; color: #444; margin-top: 10px; }
+  .note { font-size: 13px; color:#666; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Replace this src with your public image URL (or keep pie2.png in the same folder when hosting) -->
+  <img id="donutImg" class="donut-img" src="./pie2.png" alt="Donut timetable image" />
+  <div class="overlay" role="presentation">
+    <svg id="svgOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="false"></svg>
+  </div>
+</div>
+
+<!-- <div class="controls">
+  <div>• URL 쿼리 <code>?active=HH</code> 가 있으면 해당 시각(HH) 조각 강조 (예: <code>?active=15</code>)</div>
+  <div class="note">• 쿼리 없으면 방문자의 로컬 시간으로 자동 강조됩니다. • 각 조각 클릭 시 slices 배열에 설정한 URL이 새 탭으로 열립니다.</div>
+</div> -->
+
+<script>
+/* ========== 사용자 설정 (여기에 각 시간대별 실제 URL 넣으세요) ==========
+   현재 예시는 "https://www.notion.so/yourworkspace/..." 형태의 플레이스홀더 링크가 들어있습니다.
+   배포 전 반드시 자신의 실제 Notion 공유 링크(또는 다른 URL)로 대체하세요. */
+const slices = [
+  "https://www.notion.so/yourworkspace/midnight-00", // 0시
+  "https://www.notion.so/yourworkspace/01am-01",
+  "https://www.notion.so/yourworkspace/02am-02",
+  "https://www.notion.so/yourworkspace/03am-03",
+  "https://www.notion.so/yourworkspace/04am-04",
+  "https://www.notion.so/yourworkspace/05am-05",
+  "https://www.notion.so/yourworkspace/06am-06",
+  "https://www.notion.so/yourworkspace/07am-07",
+  "https://www.notion.co/yourworkspace/08am-08",
+  "https://www.notion.so/yourworkspace/09am-09",
+  "https://www.notion.so/yourworkspace/10am-10",
+  "https://www.notion.so/yourworkspace/11am-11",
+  "https://www.notion.so/yourworkspace/noon-12",
+  "https://www.notion.so/yourworkspace/13pm-13",
+  "https://www.notion.so/yourworkspace/14pm-14",
+  "https://www.notion.so/yourworkspace/15pm-15",
+  "https://www.notion.so/yourworkspace/16pm-16",
+  "https://www.notion.so/yourworkspace/17pm-17",
+  "https://www.notion.so/yourworkspace/18pm-18",
+  "https://www.notion.so/yourworkspace/19pm-19",
+  "https://www.notion.so/yourworkspace/20pm-20",
+  "https://www.notion.so/yourworkspace/21pm-21",
+  "https://www.notion.so/yourworkspace/22pm-22",
+  "https://www.notion.so/yourworkspace/23pm-23"
+];
+/* ====================================================================== */
+
+// 색상, geometry
+const colors = [
+  "#e6f2ff","#d6e9ff","#c6e1ff","#b6d8ff",
+  "#a6cff7","#97c6f0","#87bfeb","#77b6e2",
+  "#bfe9c9","#a7e1b1","#8fd99a","#77d184",
+  "#ffd9b3","#ffcc99","#ffbf80","#ffb366",
+  "#ffd6ec","#ffbfdf","#ffa8d1","#ff92c4",
+  "#f6e6ff","#e6d6ff","#d6c6ff","#c6b6ff"
+];
+const cx = 500, cy = 500, R = 420, r = 220, total = 24;
+const startOffset = -Math.PI/2;
+const svg = document.getElementById('svgOverlay');
+
+function polarToCartesian(cx, cy, radius, angleRad) {
+  return { x: cx + radius * Math.cos(angleRad), y: cy + radius * Math.sin(angleRad) };
+}
+function makeSectorPath(cx, cy, rInner, rOuter, startAngle, endAngle) {
+  const p1 = polarToCartesian(cx, cy, rOuter, startAngle);
+  const p2 = polarToCartesian(cx, cy, rOuter, endAngle);
+  const p3 = polarToCartesian(cx, cy, rInner, endAngle);
+  const p4 = polarToCartesian(cx, cy, rInner, startAngle);
+  const largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
+  return [
+    "M", p1.x, p1.y,
+    "A", rOuter, rOuter, 0, largeArc, 1, p2.x, p2.y,
+    "L", p3.x, p3.y,
+    "A", rInner, rInner, 0, largeArc, 0, p4.x, p4.y,
+    "Z"
+  ].join(" ");
+}
+
+// 시간표 레이블 (한국어)
+function hourLabel(i) {
+  if (i === 0) return "오전 12시";
+  if (i < 12) return `오전 ${i}시`;
+  if (i === 12) return "오후 12시";
+  return `오후 ${i-12}시`;
+}
+
+// get initial active index: ?active=HH > local hour > 0
+function getInitialActiveIndex() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const activeParam = params.get('active');
+    if (activeParam !== null) {
+      const n = parseInt(activeParam, 10);
+      if (!Number.isNaN(n) && n >= 0 && n < 24) return n;
+    }
+  } catch (e) { /* ignore */ }
+  const now = new Date();
+  const h = now.getHours();
+  if (!Number.isNaN(h)) return h;
+  return 0;
+}
+
+let activeIdx = getInitialActiveIndex();
+
+// create sectors and labels
+for (let i = 0; i < total; i++) {
+  const a0 = startOffset + (i/total) * Math.PI*2;
+  const a1 = startOffset + ((i+1)/total) * Math.PI*2;
+  const pathD = makeSectorPath(cx, cy, r, R, a0, a1);
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", pathD);
+  path.setAttribute("fill", colors[i % colors.length]);
+  path.setAttribute("fill-opacity", "0.06");
+  path.setAttribute("stroke", "#9aa0a6");
+  path.setAttribute("stroke-width", "1");
+  path.classList.add("slice");
+
+  // click handler: set active + open link
+  (function(idx, node){
+    node.addEventListener('click', function(e){
+      e.preventDefault();
+      setActive(idx);
+      const url = slices[idx] || "#";
+      if (url.startsWith("#")) {
+        alert(`${hourLabel(idx)} 클릭됨 (placeholder link). 실제 URL로 slices[${idx}]를 교체하세요.`);
+      } else {
+        window.open(url, "_blank");
+      }
+    });
+    node.addEventListener('mouseenter', function(){ node.setAttribute("fill-opacity", "0.14"); });
+    node.addEventListener('mouseleave', function(){ if(!node.classList.contains('active')) node.setAttribute("fill-opacity", "0.06"); });
+  })(i, path);
+
+  const mid = (a0 + a1) / 2;
+  const labelPt = polarToCartesian(cx, cy, (r+R)/2, mid);
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", labelPt.x.toFixed(2));
+  text.setAttribute("y", labelPt.y.toFixed(2));
+  text.setAttribute("class", "label");
+  text.textContent = hourLabel(i);
+
+  svg.appendChild(path);
+  svg.appendChild(text);
+}
+
+// setActive function
+function setActive(i) {
+  const all = svg.querySelectorAll(".slice");
+  all.forEach((s, idx) => {
+    if (idx === i) {
+      s.classList.add("active");
+      s.setAttribute("fill-opacity", "0.28");
+      s.setAttribute("stroke-width", "2.2");
+      s.setAttribute("stroke", "#1a73e8");
+    } else {
+      s.classList.remove("active");
+      s.setAttribute("fill-opacity", "0.06");
+      s.setAttribute("stroke-width", "1");
+      s.setAttribute("stroke", "#9aa0a6");
+    }
+  });
+  activeIdx = i;
+}
+
+// initial highlight
+setActive(activeIdx);
+
+// Optional: allow left/right arrow to change active slice (for keyboard users)
+document.addEventListener('keydown', function(e){
+  if (e.key === 'ArrowRight') {
+    setActive((activeIdx + 1) % total);
+  } else if (e.key === 'ArrowLeft') {
+    setActive((activeIdx - 1 + total) % total);
+  }
+});
+</script>
+</body>
+</html>
