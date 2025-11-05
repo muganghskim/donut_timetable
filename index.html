@@ -228,8 +228,18 @@ function buildDonut() {
         if (!url || url.startsWith("#")) {
           alert(`${hourLabel(idx)} 클릭됨 — 링크가 설정되어 있지 않습니다.\n설정 창에서 URL을 입력하고 저장하세요.`);
         } else {
-          // 현재 창에서 이동 (새 탭 아님)
-          window.location.href = url;
+          try {
+            // 현재 창이 최상위이면 그냥 이동, 아니면 top으로 이동
+            if (window.top === window.self) {
+              window.location.href = url;
+            } else {
+              // 부모 프레임이 있으면 최상위 창으로 강제 이동
+              window.top.location.href = url;
+            }
+          } catch (err) {
+            // 보안(권한) 문제로 top 접근이 실패할 수 있으므로 폴백으로 location.href
+            window.location.href = url;
+          }
         }
       });
       node.addEventListener('mouseenter', function(){ node.setAttribute("fill-opacity", "0.14"); });
