@@ -228,7 +228,8 @@ function buildDonut() {
         if (!url || url.startsWith("#")) {
           alert(`${hourLabel(idx)} 클릭됨 — 링크가 설정되어 있지 않습니다.\n설정 창에서 URL을 입력하고 저장하세요.`);
         } else {
-          window.open(url, "_blank");
+          // 현재 창에서 이동 (새 탭 아님)
+          window.location.href = url;
         }
       });
       node.addEventListener('mouseenter', function(){ node.setAttribute("fill-opacity", "0.14"); });
